@@ -450,7 +450,6 @@ export const codeData = {
       container,
       storageKey: 'tw::code-data',
       placeholderText: PLACEHOLDER,
-      buttons: ACTIONS,
       toolbarLeft: [
         { label: 'Copy', className: 'tw-btn tw-btn-primary', onClick: ({ getValue }) => copyOutput(getValue)() },
       ],

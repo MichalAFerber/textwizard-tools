@@ -385,7 +385,6 @@ export const generators = {
       container,
       storageKey: 'tw::generators',
       placeholderText: PLACEHOLDER,
-      buttons: ACTIONS,
       toolbarLeft: [
         {
           label: 'Copy',

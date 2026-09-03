@@ -98,7 +98,6 @@ export const caseConverter = {
       container,
       storageKey: 'tw::case-converter',
       placeholderText: PLACEHOLDER,
-      buttons: ACTIONS,
       toolbarLeft: [
         {
           label: 'Copy',

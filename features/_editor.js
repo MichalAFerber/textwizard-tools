@@ -7,7 +7,6 @@ export function createEditor({
   placeholderText,
   toolbarLeft = [],
   toolbarRight = [],
-  buttons = [],
   options = [],
   optionDefaults = {},
 }) {
@@ -41,7 +40,7 @@ export function createEditor({
   try {
     const saved = JSON.parse(localStorage.getItem(optStorageKey) || 'null');
     if (saved && typeof saved === 'object') Object.assign(optionState, saved);
-  } catch {}
+  } catch { /* unreadable or private-mode storage: fall back to defaults */ }
 
   // Render options
   if (options.length) {
@@ -162,7 +161,7 @@ export function createEditor({
     try {
       const parsed = JSON.parse(localStorage.getItem(saveKey) || 'null');
       if (parsed && parsed.name && parsed.ext) last = parsed;
-    } catch {}
+    } catch { /* unreadable or private-mode storage: `last` stays null */ }
 
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
