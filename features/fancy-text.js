@@ -263,8 +263,8 @@ export const fancyText = {
     // original text (not stack onto the previous style).
     const SRC_KEY = 'tw::fancy-text::source';
     let source = '';
-    try { source = localStorage.getItem(SRC_KEY) || ''; } catch {}
-    const persistSource = (v) => { source = v; try { localStorage.setItem(SRC_KEY, v); } catch {} };
+    try { source = localStorage.getItem(SRC_KEY) || ''; } catch { /* private mode: start empty */ }
+    const persistSource = (v) => { source = v; try { localStorage.setItem(SRC_KEY, v); } catch { /* private mode or quota: in-memory only */ } };
 
     const editor = createEditor({
       container,

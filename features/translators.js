@@ -148,7 +148,6 @@ export const translators = {
       container,
       storageKey: 'tw::translators',
       placeholderText: PLACEHOLDER,
-      buttons: ACTIONS,
       toolbarLeft: [
         {
           label: 'Copy',

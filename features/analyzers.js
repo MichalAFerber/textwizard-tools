@@ -106,7 +106,6 @@ export const analyzers = {
       container,
       storageKey: 'tw::analyzers',
       placeholderText: PLACEHOLDER,
-      buttons: ACTIONS,
       toolbarLeft: [
         {
           label: 'Copy',

@@ -45,7 +45,9 @@ const T = {
   removeEmDashes: (s) => norm(s).replace(/[—–]/g, ''),
   removeUnderscores: (s) => norm(s).replace(/_+/g, ' '),
 
-  // Drop ANSI escape sequences (terminal color/style codes).
+  // Drop ANSI escape sequences (terminal color/style codes). \x1B IS the escape
+  // character, so matching it is the whole point here, not an oversight.
+  // eslint-disable-next-line no-control-regex -- intentional: ANSI starts with ESC
   stripAnsi: (s) => norm(s).replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, ''),
 
   // Drop HTML/XML tags but keep their text content.
@@ -62,9 +64,9 @@ const T = {
   // ASCII quotes/dashes -> typographic versions.
   straightToSmart: (s) => {
     let out = norm(s)
-      .replace(/(^|[\s(\[{"'])"/g, '$1“')
+      .replace(/(^|[\s([{"'])"/g, '$1“')
       .replace(/"/g, '”')
-      .replace(/(^|[\s(\[{"“])'/g, '$1‘')
+      .replace(/(^|[\s([{"“])'/g, '$1‘')
       .replace(/'/g, '’')
       .replace(/---/g, '—')
       .replace(/--/g, '–')
@@ -84,7 +86,7 @@ const T = {
 
   // Strip leading line numbers (formats: "1. ", "1) ", "1: ", "1- ").
   stripLineNumbers: (s) =>
-    norm(s).split('\n').map((l) => l.replace(/^\s*\d+[.):\-]\s*/, '')).join('\n'),
+    norm(s).split('\n').map((l) => l.replace(/^\s*\d+[.):-]\s*/, '')).join('\n'),
 
   // Join lines within each paragraph (paragraphs are separated by blank lines).
   unwrapParagraphs: (s) =>
@@ -272,7 +274,6 @@ export const textTools = {
       // saved text carries over.
       storageKey: 'tw::whitespace-cleaner',
       placeholderText: PLACEHOLDER,
-      buttons: ACTIONS,
       toolbarLeft: [
         {
           label: 'Copy',
