@@ -1,7 +1,7 @@
 {
   "name": "textwizard-tools",
   "version": "1.0.0",
-  "description": "The browser-local text & code tools behind textwizard.us \u2014 MIT-licensed, zero dependencies, no uploads.",
+  "description": "The browser-local text & code tools behind textwizard.us — MIT-licensed, zero dependencies, no uploads.",
   "type": "module",
   "license": "MIT",
   "author": "Michal Ferber",
@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.10.0",
+    "eslint": "^10.9.1",
     "globals": "^17.12.0",
     "vitest": "^4.1.5"
   }
