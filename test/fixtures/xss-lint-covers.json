@@ -1,0 +1,4 @@
+{
+  "covers": ["tools.js", "features/text-tools.js", "features/fancy-text.js"],
+  "why": "The tool host and two feature modules that build result markup from user-supplied text. features/code-data.js is deliberately NOT named: it carries the repo's declared §15 opt-out (its report is join('\\n')-ed and rendered as text), so the rule resolves to 0 there by design."
+}
