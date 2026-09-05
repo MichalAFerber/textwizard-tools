@@ -1,4 +1,4 @@
 {
-  "covers": ["tools.js", "features/text-tools.js", "features/fancy-text.js"],
-  "why": "The tool host and two feature modules that build result markup from user-supplied text. features/code-data.js is deliberately NOT named: it carries the repo's declared §15 opt-out (its report is join('\\n')-ed and rendered as text), so the rule resolves to 0 there by design."
+  "covers": ["features/_editor.js", "features/diff.js", "features/qr-code.js"],
+  "why": "The three modules that build DOM from user-supplied text: the shared tool shell (_editor.js), the diff renderer, and the QR panel. Each assigns innerHTML and/or calls document.createElement, and measured 2026-09-05 they are the only three of this repo's 11 linted files that carry any markup construct at all — the other eight score zero on innerHTML, insertAdjacentHTML, outerHTML and createElement. features/code-data.js is deliberately absent: it carries the declared §15 opt-out, its report is join('\\n')-ed and rendered as text, and the rule resolves to severity 0 for it."
 }
