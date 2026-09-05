@@ -219,8 +219,48 @@ async function ruleCoverage(root = process.cwd()) {
  * fixture, resolved from THIS file rather than from `process.cwd()`, so it is
  * found identically whether CI runs at the repo root or inside a workspace
  * package.
+ *
+ * THAT ROBUSTNESS USED TO STOP AT THE FILE AND NOT REACH THE NAMES INSIDE IT.
+ * The names then went through `existsSync` and `calculateConfigForFile`, both
+ * cwd-relative, so finding the sidecar from a subdirectory only bought four
+ * confusing "does not exist" failures instead of one clear one. Two adopters
+ * had already resolved the ambiguity in opposite directions — `wizard-web`
+ * writes `../../apps/…` because `turbo` runs the suite inside
+ * `packages/config`, `mykk.us-extension` writes `content.js` from the repo
+ * root — so the same field meant two things. `resolveNamed` below accepts
+ * both.
  */
 const COVERS = resolve(here, 'fixtures/xss-lint-covers.json');
+
+/**
+ * The repo root: the nearest ancestor of THIS file holding `.git`. A worktree's
+ * `.git` is a file rather than a directory, which `existsSync` handles.
+ */
+function repoRoot() {
+  let dir = here;
+  for (;;) {
+    if (existsSync(join(dir, '.git'))) return dir;
+    const up = dirname(dir);
+    if (up === dir) return null;
+    dir = up;
+  }
+}
+
+/**
+ * A name from the declaration, resolved to an absolute path. Tried against the
+ * cwd first and the repo root second, so a declaration written for either
+ * convention works from either place. Returns null when the file is at neither,
+ * which is the declaration doing its job.
+ */
+function resolveNamed(named, root) {
+  const fromCwd = resolve(process.cwd(), named);
+  if (existsSync(fromCwd)) return fromCwd;
+  if (root) {
+    const fromRoot = resolve(root, named);
+    if (existsSync(fromRoot)) return fromRoot;
+  }
+  return null;
+}
 
 /**
  * WHY A NAMED FILE AND NOT A COUNT. Read this before replacing it with a
@@ -278,15 +318,30 @@ const COVERS = resolve(here, 'fixtures/xss-lint-covers.json');
  * Blocking them turns the one case that actually happened from "a reviewer
  * might notice" into "CI says so."
  *
- * A repo whose genuine product source lives under one of these paths raises it
- * in tgwab-standards rather than editing this vendored file — that is §15's
- * rule for any change to the kit, not a special case here. It is expected to be
- * rare: these are the directories a repo puts things in BECAUSE they do not
- * ship.
+ * THE SECOND PATTERN IS ANCHORED, AND THAT ANCHOR IS LOAD-BEARING. It matches
+ * only at the top of the path the adopter names — `scripts/stamp-version.mjs`,
+ * not `apps/punctuationwizard/src/scripts/tool-mount.js`. The unanchored version
+ * was written first and rejected that second file, which is real browser product
+ * source in `wizard-web`, on its first run against a monorepo. A denylist that
+ * blocks legitimate source is worse than one that misses a case: the miss is
+ * caught in review, the false positive is "fixed" by weakening the check.
+ *
+ * SO THIS DOES NOT CATCH EVERYTHING, deliberately. `apps/foo/scripts/build.mjs`
+ * passes it. That is the reviewer's job and this file cannot do it — see the
+ * honesty note above about what this control is.
+ *
+ * `../../scripts/foo.js` USED TO PASS IT TOO, and no longer does: the name is
+ * normalised to its repo-root-relative form before these run, so a path that
+ * climbs out of a workspace package is tested as the anchor reads it. That is a
+ * side effect of fixing the resolution, not a second control.
+ *
+ * A repo whose genuine product source lives at one of these top-level paths
+ * raises it in tgwab-standards rather than editing this vendored file — that is
+ * §15's rule for any change to the kit, not a special case here.
  */
 const NOT_PRODUCT_SOURCE = [
   /(^|\/)[^/]*\.config\.(js|mjs|cjs)$/,
-  /(^|\/)(scripts|migrations|tests?|__tests__|e2e|loadtest|test-kit)\//,
+  /^(scripts|migrations|tests?|__tests__|e2e|loadtest|test-kit)\//,
 ];
 
 function readDeclaration() {
@@ -315,9 +370,32 @@ describe('the rule reaches this repo (DS §15)', () => {
     // REPORTED, NOT ASSERTED. The shape is worth seeing — 7 of 29 and 3 of 3
     // are very different repos — but neither number is the gate, because both
     // of those passed the gate that WAS a number.
-    console.log(
+    //
+    // WRITTEN STRAIGHT TO STDOUT, NOT VIA console.log. THIS IS HARDENING, NOT A
+    // FIX — read the next paragraph before assuming it repaired a broken CI.
+    //
+    // The count DID reach CI under console.log, verified 2026-09-05 in the
+    // Actions logs of five adopters at their reviewed heads. What hid it was
+    // vitest 4's reporter selection ON AN AI AGENT'S MACHINE:
+    //
+    //   reporters.push([isAgent ? 'agent' : 'default', {}])   // vitest 4
+    //   ReportersMap.agent = MinimalReporter                  // silent: 'passed-only'
+    //
+    // `isAgent` is std-env's, set by CLAUDECODE / AI_AGENT / CURSOR_AGENT and
+    // friends, so every agent-run `npm test` in this estate selects a reporter
+    // that DROPS console output from PASSING tests. GitHub Actions is not an
+    // agent, gets `default`, and prints. Measured by flipping only that: same
+    // command, same tree, agent vars present 0 occurrences, cleared 1.
+    //
+    // THREE REVIEWERS FILED "the count never appears" FROM SUCH A RUN, and the
+    // amendment that added this control was blocked on it. That is the cost
+    // being designed out: a report whose visibility depends on WHO is running
+    // the suite is not a report. process.stdout.write bypasses the reporter
+    // entirely, so agent, human, and CI all see the same line. Do not tidy this
+    // back to console.log.
+    process.stdout.write(
       `DS §15 coverage: the rule resolves for ${covered.length} of ${linted} ` +
-        `linted files; ${d.covers.length} named as product source.`,
+        `linted files; ${d.covers.length} named as product source.\n`,
     );
 
     if (d.covers.length === 0) {
@@ -332,14 +410,21 @@ describe('the rule reaches this repo (DS §15)', () => {
     }
 
     const eslint = new ESLint();
+    const root = repoRoot();
     for (const named of d.covers) {
+      const abs = resolveNamed(named, root);
+      // The form the denylist above is written against. Falls back to the raw
+      // name when the file is at neither location — the existence check below
+      // is the one that should report that, not a confusing denylist hit.
+      const normalized = abs && root ? relative(root, abs) : named;
+
       expect(
         KIT_FILES.has(basename(named)),
         `DS §15: \`${named}\` is a file this repo GAINS by adopting the kit. ` +
           'Naming it proves the kit lints itself, which is not coverage.',
       ).toBe(false);
       expect(
-        NOT_PRODUCT_SOURCE.some((re) => re.test(named)),
+        NOT_PRODUCT_SOURCE.some((re) => re.test(normalized)),
         `DS §15: \`${named}\` is build tooling, not product source. A repo ` +
           'passed this check 3 of 3 on a config file, a migrations runner and a ' +
           'version stamper while every file that rendered HTML was invisible — ' +
@@ -348,13 +433,14 @@ describe('the rule reaches this repo (DS §15)', () => {
           'edit this vendored file.',
       ).toBe(false);
       expect(
-        existsSync(named),
+        abs !== null,
         `DS §15: \`${named}\` is named in xss-lint-covers.json but does not ` +
-          `exist (resolved from ${process.cwd()}). If it moved, update the ` +
+          `exist. Looked from the cwd (${process.cwd()}) and from the repo ` +
+          `root (${root ?? 'not found'}). If it moved, update the ` +
           'declaration — this failing is the declaration doing its job.',
       ).toBe(true);
       expect(
-        carriesTheRule(await eslint.calculateConfigForFile(named)),
+        carriesTheRule(await eslint.calculateConfigForFile(abs)),
         `DS §15: the rule does NOT resolve for \`${named}\`, which this repo ` +
           'names as covered product source. Widen the rule block\'s `files` ' +
           'glob, or correct the declaration. Do not delete this test to go ' +
