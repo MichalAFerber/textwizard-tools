@@ -115,12 +115,13 @@ export default [
   // ---------------------------------------------------------------------------
   // §15: required in any repo whose source renders HTML.
   //
-  // WHY THE SCOPE IS `**/*.js` AND NOT A LIST OF DIRECTORIES. Read this before
-  // narrowing it, because narrowing it is how this rule was inert on arrival.
+  // WHY THE SCOPE IS `**/*.{js,mjs,cjs}` AND NOT A LIST OF DIRECTORIES OR ONE
+  // EXTENSION. Read this before narrowing either half, because narrowing is how
+  // this rule was inert on arrival — twice, in two unrelated ways.
   //
-  // The shipped scope was `src/**/*.js`. Five repos have ZERO files under
-  // `src/` — their JavaScript sits at the repo root — so the rule matched
-  // nothing at all in them:
+  // (1) THE PATH HALF. The shipped scope was `src/**/*.js`. Five repos have ZERO
+  // files under `src/` — their JavaScript sits at the repo root — so the rule
+  // matched nothing at all in them:
   //
   //     copywizard-extension       0 under src/,  5 .js at root
   //     capturewizard-extension    0 under src/, 10 .js at root
@@ -137,16 +138,49 @@ export default [
   // estate already has a third layout and a fourth — `apps/<app>/src/`,
   // `worker/src/`, `js/`, `functions/` — and an enumerated list meets each new
   // one by silently matching zero files in it. That is the same defect again,
-  // rediscovered later by whoever is unlucky.
+  // rediscovered later by whoever is unlucky. The `**/` prefix cannot fail that
+  // way. Its failure mode is the opposite and the safe one: a layout nobody
+  // anticipated gets linted, and if that surfaces vendored or generated code the
+  // answer is a named entry in the ignores above, which is reviewable. Too many
+  // findings is a conversation. Zero findings looks exactly like success.
   //
-  // `**/*.js` cannot fail that way. Its failure mode is the opposite and the
-  // safe one: a layout nobody anticipated gets linted, and if that surfaces
-  // vendored or generated code the answer is a named entry in the ignores
-  // above, which is reviewable. Too many findings is a conversation. Zero
-  // findings looks exactly like success.
+  // (2) THE EXTENSION HALF, which the path fix left behind. `**/*.js` matches
+  // NEITHER `.mjs` NOR `.cjs`. Both are plain JavaScript that ESLint already
+  // parses with no extra dependency and no parser option — they were excluded
+  // only because the pattern named a single extension. Measured by planting ONE
+  // byte-identical hazard three times and reading back which rules fired:
+  //
+  //     file          §15 rule   no-unused-vars (the control)
+  //     hazard.js         1             1
+  //     hazard.mjs        0             1   <-- linted, and not covered
+  //     hazard.cjs        0             1   <-- linted, and not covered
+  //
+  // The control column is the whole point. `no-unused-vars` fired on all three,
+  // so ESLint was demonstrably reading every file: the instrument worked and the
+  // rule still said nothing. Widening the extension is free — same parser, same
+  // dependencies, same fixture result (still 5 of 5, both negative controls
+  // still clean).
+  //
+  // Measured across the 75 local clones with the ignores above applied: 371
+  // `.js` and 149 `.mjs` (no `.cjs` in the estate yet). So the extension half
+  // alone left 149 files of plain JavaScript unreachable — and 25 of the 58
+  // repos that ship any plain JavaScript contain not one `.js` file, so the rule
+  // was FULLY INERT in all 25. `uploadwizard-app` and every `*-viewer.us` are
+  // among them.
+  //
+  // WHAT THIS SCOPE STILL DOES NOT REACH — DECLARED, SO A GREEN RUN IS NOT READ
+  // AS COVERAGE. `.ts`, `.tsx`, and `.astro` are NOT linted by this config. They
+  // need a parser (`typescript-eslint`, `eslint-plugin-astro`), which is a
+  // dependency and an estate-level decision, not a glob edit — deliberately out
+  // of scope here and owned by devops. It is also the larger half: the same scan
+  // counts 315 `.ts` and 290 `.astro` against 520 files of plain JavaScript, and
+  // in an Astro or TS repo the HTML is rendered in exactly the files this rule
+  // cannot see. Widening to `.mjs`/`.cjs` moves the rule from 371 to 520 of
+  // 1,125 source files (33% -> 46%). That closes a plain defect; it does not
+  // finish the job.
   // ---------------------------------------------------------------------------
   {
-    files: ['**/*.js'],
+    files: ['**/*.{js,mjs,cjs}'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -158,6 +192,49 @@ export default [
         },
       ],
     },
+  },
+
+  // ---------------------------------------------------------------------------
+  // THE §15 KIT IS VENDORED, SO REPO-LOCAL STYLE DOES NOT APPLY TO IT.
+  //
+  // Both shipped files are specimens, not this repo's code. Their value is the
+  // MEASUREMENT they encode -- a direct-child selector catches 2 of 5 hazards, a
+  // descendant catches 5 of 5. If each repo reformats them to satisfy its own
+  // style config the specimens diverge, the counts stop being comparable across
+  // the estate, and the fixture stops being evidence and becomes decoration.
+  // Any change to either file is a change to the STANDARD, not to the repo: it
+  // lands in tgwab-standards and is re-vendored from there (DS §15).
+  //
+  // WHICH FILE ACTUALLY NEEDS THIS, BECAUSE IT IS NOT THE OBVIOUS ONE. The
+  // unbraced `if (...) continue;` is in xss-lint-fixture.TEST.js, not in the
+  // fixture -- the fixture contains no if/for/continue/break at all. The fixture
+  // is also named in the global ignores above, so it is not linted in a repo
+  // that adopts this config whole. An exemption naming only the fixture would
+  // therefore be scoped to a file that has no offending line AND is not linted:
+  // precise, inherited, and protecting nothing.
+  //
+  // The fixture IS still listed, and honestly: that entry is inert today and was
+  // measured to be. It changes no outcome in either adoption shape -- whole
+  // (fixture globally ignored, never linted) or partial, where repos merge the
+  // §15 blocks into an existing config and keep their own `ignores`
+  // (resizewizard-api is the live example). In the partial shape the fixture is
+  // linted and does report errors, but they are the five deliberate XSS
+  // findings, which no `curly` exemption touches. It is listed because §15
+  // exempts the whole vendored kit from repo-local style and the config should
+  // say what the standard says -- and so a future revision that gives the
+  // fixture a conditional is covered without rediscovering this.
+  //
+  // SCOPED TO TWO FILENAMES, NOT TO A DIRECTORY. The adopting repo's own tests
+  // keep `curly` and every other style rule. An exemption that leaks past its
+  // two files is the silent version of this fix and looks identical to a working
+  // one, so it is verified in both directions.
+  //
+  // KEEP THIS BLOCK LAST AMONG RULE BLOCKS. Flat config is last-wins; hoisted
+  // above a repo's own style block, it is silently overridden.
+  // ---------------------------------------------------------------------------
+  {
+    files: ['**/xss-lint-fixture.js', '**/xss-lint-fixture.test.js'],
+    rules: { curly: 'off' },
   },
 
   // ---------------------------------------------------------------------------
