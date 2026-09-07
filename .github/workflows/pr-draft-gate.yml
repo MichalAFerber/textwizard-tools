@@ -129,10 +129,20 @@ jobs:
         run: |
           # --- decision:begin ---
           # Everything between these markers is a pure function of $EVENTS,
-          # $IS_DRAFT, $LABELS and $PR_NUMBER. scripts/check-draft-gate.test.sh
-          # extracts THIS block from THIS file and runs it against synthetic
-          # histories, so the control exercises the shipped code rather than a
-          # copy of it that can drift away from it.
+          # $IS_DRAFT, $LABELS and $PR_NUMBER. In tgwab-standards,
+          # scripts/check-draft-gate.test.sh extracts this block from
+          # .github/workflows/pr-draft-gate.yml — the file that actually runs,
+          # not a copy of it — and executes it against synthetic histories.
+          # Guard 0 in that same suite separately holds that file byte-identical
+          # to templates/pr-draft-gate.yml, and it is guard 0, not the extraction,
+          # that makes the run evidence about the template this repo ships.
+          #
+          # That script does NOT travel with this file, and must not: a gate
+          # that depended on a script vendored alongside it could be disabled by
+          # not vendoring the script. So in every repo BUT tgwab-standards this
+          # block is verified by being byte-identical to the template, which is
+          # a claim about a file nothing here can check. scripts/check-gate-drift.sh
+          # checks it, centrally, and is the only thing that does.
           set -euo pipefail
 
           # Exact match on a comma-delimited list, so a label named
